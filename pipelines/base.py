@@ -257,7 +257,9 @@ class Pipeline(ABC):
                         self._save_checkpoint()
 
                 if is_evaluating_step:
+                    self.model.eval()
                     result_eval = self.evaluate()
+                    self.model.train()
                     if self.is_master:
                         self.wandb_run.log(result_eval, step=self.now_steps)
                         self._save_checkpoint()

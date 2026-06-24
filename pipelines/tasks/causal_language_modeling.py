@@ -85,7 +85,6 @@ class CausalLanguageModelingPipeline(Pipeline):
 
     @torch.no_grad()
     def evaluate(self):
-        self.model.eval()
         total_loss = torch.tensor(0., device=self.device)
         n = 0
         for batch in self.test_loader:
@@ -95,7 +94,6 @@ class CausalLanguageModelingPipeline(Pipeline):
                 loss = self._loss_fn(pred, labels)
             total_loss += loss
             n += 1
-        self.model.train()
         total_loss = self._reduce(total_loss)
         avg_loss = (total_loss / n)
         ppl = torch.exp(avg_loss)
