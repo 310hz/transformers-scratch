@@ -66,21 +66,21 @@ class CausalLanguageModelingPipeline(Pipeline):
     def _unpack_batch(self, batch):
         token_ids, seq_ids = batch
         input_ids = token_ids[:, :-1].contiguous().to(self.device)
-        labels = token_ids[:, 1:].contiguous().to(self.device)
+        targets = token_ids[:, 1:].contiguous().to(self.device)
         seq_ids = seq_ids[:, :-1]
         mask = (seq_ids[:, :, None] != seq_ids[:, None, :]).to(self.device)
-        return input_ids, labels, mask
+        return input_ids, targets, mask
 
-    def _loss_fn(self, pred, labels):
-        pred = pred.view(-1, pred.size(-1))
-        labels = labels.view(-1)
-        loss = F.cross_entropy(pred, labels)
+    def _loss_fn(self, predicts, targets):
+        predicts = predicts.view(-1, predicts.size(-1))
+        targets = targets.view(-1)
+        loss = F.cross_entropy(predicts, targets)
         return loss
 
     def calc_loss(self, batch):
-        input_ids, labels, attention_mask = self._unpack_batch(batch)
-        pred = self.model(input_ids, attention_mask)
-        loss = self._loss_fn(pred, labels)
+        input_ids, targets, attention_mask = self._unpack_batch(batch)
+        predicts = self.model(input_ids, attention_mask)
+        loss = self._loss_fn(predicts, targets)
         return loss
 
     @torch.no_grad()
@@ -88,10 +88,10 @@ class CausalLanguageModelingPipeline(Pipeline):
         total_loss = torch.tensor(0., device=self.device)
         n = 0
         for batch in self.test_loader:
-            input_ids, labels, attention_mask = self._unpack_batch(batch)
+            input_ids, targets, attention_mask = self._unpack_batch(batch)
             with self.context_autocast:
-                pred = self.model(input_ids, attention_mask)
-                loss = self._loss_fn(pred, labels)
+                predicts = self.model(input_ids, attention_mask)
+                loss = self._loss_fn(predicts, targets)
             total_loss += loss
             n += 1
         total_loss = self._reduce(total_loss)
