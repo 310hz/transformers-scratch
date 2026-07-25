@@ -60,12 +60,12 @@ class ImageClassificationPipeline(Pipeline):
 class ImageClassificationNanoPipeline(ImageClassificationPipeline):
     def get_dataset(self):
         ds_train = load_dataset(
-            "uoft-cs/cifar10",
+            "ylecun/mnist",
             split="train",
             streaming=True,
         )
         ds_test = load_dataset(
-            "uoft-cs/cifar10",
-            split="test[:100]",
+            "ylecun/mnist",
+            split="test[:10]",
         )
         return ds_train, ds_test, ImageDataset

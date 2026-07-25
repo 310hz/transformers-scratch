@@ -5,4 +5,7 @@ from .tasks.causal_language_modeling import (
     CausalLanguageModelingPipeline,
     CausalLanguageModelingNanoPipeline,
 )
-from .tasks.image_classification import ImageClassificationPipeline
+from .tasks.image_classification import (
+    ImageClassificationPipeline,
+    ImageClassificationNanoPipeline,
+)
