@@ -79,6 +79,8 @@ class Pipeline(ABC):
         self.eval_interval = config_train.eval_interval
         self.save_interval = config_train.save_interval
 
+        self.metrics = self.get_metrics()
+
         if self.is_master:
             print(f"Model: {self.config.model.name}")
             print(f"Number of parameters: {self.n_params:,}")
@@ -233,7 +235,9 @@ class Pipeline(ABC):
                     context_nosync = contextlib.nullcontext()
 
                 with context_nosync, self.context_autocast:
-                    loss = self.calc_loss(batch)
+                    predicts, targets = self.forward(batch)
+                    self.metrics.update(predicts, targets)
+                    loss = self.loss_fn(predicts, targets)
                 loss_scaled = self.scaler.scale(loss / self.grad_accum_steps)
                 loss_scaled.backward()
 
@@ -248,21 +252,13 @@ class Pipeline(ABC):
                     self.scheduler.step()
 
                 if is_logging_step:
-                    loss = self._reduce(loss.detach())
-                    if self.is_master:
-                        self.wandb_run.log(
-                            { "train/loss": loss },
-                            step=self.now_steps,
-                        )
-                        self._save_checkpoint()
+                    self.logging(self.metrics.compute(), prefix="train/")
 
                 if is_evaluating_step:
                     self.model.eval()
                     result_eval = self.evaluate()
                     self.model.train()
-                    if self.is_master:
-                        self.wandb_run.log(result_eval, step=self.now_steps)
-                        self._save_checkpoint()
+                    self.logging(result_eval, prefix="test/")
 
                 if is_saving_step:
                     if self.is_master:
@@ -312,14 +308,33 @@ class Pipeline(ABC):
             fpath_snapshot = self.dpath_ckpt / fname_snapshot
             torch.save(state_dict, fpath_snapshot)
 
+    def logging(self, data: dict, prefix: str = ""):
+        data = {f"{prefix}{k}": v for k, v in data.items()}
+        if self.is_master:
+            self.wandb_run.log(data, step=self.now_steps)
+            self._save_checkpoint()
+
+    @torch.no_grad()
+    def evaluate(self):
+        metrics = self.get_metrics()
+        for batch in self.test_loader:
+            predicts, targets = self.forward(batch)
+            metrics.update(predicts, targets)
+        result = metrics.compute()
+        return result
+
     @abstractmethod
     def get_dataset(self):
         pass
 
     @abstractmethod
-    def calc_loss(self, batch):
+    def get_metrics(self):
         pass
 
     @abstractmethod
-    def evaluate(self):
+    def forward(self, batch):
+        pass
+
+    @abstractmethod
+    def loss_fn(self, predicts, targets):
         pass

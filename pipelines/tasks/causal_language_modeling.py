@@ -5,6 +5,7 @@ from transformers import PreTrainedTokenizerFast
 from datasets import load_dataset
 
 from ..base import Pipeline
+from ..metrics import NamedMetric, CrossEntropy, Perplexity
 
 
 class TextDataset(IterableDataset):
@@ -63,6 +64,12 @@ class CausalLanguageModelingPipeline(Pipeline):
         get_ds_func = lambda ds: TextDataset(ds, tokenizer, max_len)
         return ds_train, ds_test, get_ds_func
 
+    def get_metrics(self):
+        return NamedMetric({
+            "cross_entropy": CrossEntropy(),
+            "perplexity": Perplexity(),
+        })
+
     def _unpack_batch(self, batch):
         token_ids, seq_ids = batch
         input_ids = token_ids[:, :-1].contiguous().to(self.device)
@@ -71,37 +78,16 @@ class CausalLanguageModelingPipeline(Pipeline):
         mask = (seq_ids[:, :, None] != seq_ids[:, None, :]).to(self.device)
         return input_ids, targets, mask
 
-    def _loss_fn(self, predicts, targets):
-        predicts = predicts.view(-1, predicts.size(-1))
-        targets = targets.view(-1)
-        loss = F.cross_entropy(predicts, targets)
-        return loss
-
-    def calc_loss(self, batch):
+    def forward(self, batch):
         input_ids, targets, attention_mask = self._unpack_batch(batch)
         predicts = self.model(input_ids, attention_mask)
-        loss = self._loss_fn(predicts, targets)
-        return loss
+        predicts = predicts.view(-1, predicts.size(-1))
+        targets = targets.view(-1)
+        return predicts, targets
 
-    @torch.no_grad()
-    def evaluate(self):
-        total_loss = torch.tensor(0., device=self.device)
-        n = 0
-        for batch in self.test_loader:
-            input_ids, targets, attention_mask = self._unpack_batch(batch)
-            with self.context_autocast:
-                predicts = self.model(input_ids, attention_mask)
-                loss = self._loss_fn(predicts, targets)
-            total_loss += loss
-            n += 1
-        total_loss = self._reduce(total_loss)
-        avg_loss = (total_loss / n)
-        ppl = torch.exp(avg_loss)
-        result = {
-            "test/loss": avg_loss.item(),
-            "test/perplexity": ppl.item(),
-        }
-        return result
+    def loss_fn(self, predicts, targets):
+        loss = F.cross_entropy(predicts, targets)
+        return loss
 
     @torch.inference_mode()
     def infer(
