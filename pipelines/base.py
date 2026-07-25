@@ -255,9 +255,8 @@ class Pipeline(ABC):
 
                 if is_evaluating_step:
                     self.model.eval()
-                    result_eval = self.evaluate()
+                    self.logging(self.evaluate(), prefix="test/")
                     self.model.train()
-                    self.logging(result_eval, prefix="test/")
 
                 if is_saving_step:
                     if self.is_master:
