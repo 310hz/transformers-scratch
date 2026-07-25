@@ -70,6 +70,7 @@ class BaseMeanMetric(BaseMetric):
 class Accuracy(BaseMeanMetric):
     @torch.no_grad()
     def update(self, predicts, targets):
+        predicts = predicts.argmax(dim=-1)
         self.sum += (predicts == targets).to(torch.float32).sum()
         self.n_total += predicts.numel()
 
