@@ -21,7 +21,7 @@ class BaseMetric(ABC):
         pass
 
 
-class MixedMetric:
+class NamedMetric:
     def __init__(self, metrics: dict[str, BaseMetric]):
         self.metrics = metrics
 
