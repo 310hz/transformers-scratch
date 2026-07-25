@@ -8,20 +8,22 @@ from ..metrics import NamedMetric, CrossEntropy, Accuracy
 
 
 class ImageDataset(IterableDataset):
-    def __init__(self, ds):
+    def __init__(self, ds, colname_image="image", colname_target="label"):
         self.ds = ds
         self.transform = transforms.Compose([
             transforms.Resize(224),
             transforms.RandomCrop(224),
             transforms.ToTensor(),
         ])
+        self.colname_image = colname_image
+        self.colname_target = colname_target
 
     def __iter__(self):
         for sample in self.ds:
-            img = sample["image"]
-            label = sample["label"]
-            img = self.transform(img)
-            yield img, label
+            imgs = sample[self.colname_image]
+            targets = sample[self.colname_target]
+            imgs = self.transform(imgs)
+            yield imgs, targets
 
 
 class ImageClassificationPipeline(Pipeline):
@@ -48,8 +50,6 @@ class ImageClassificationPipeline(Pipeline):
         imgs = imgs.to(self.device)
         targets = targets.to(self.device)
         predicts = self.model(imgs)
-        predicts = predicts.view(-1, predicts.size(-1))
-        targets = targets.view(-1)
         return predicts, targets
 
     def loss_fn(self, predicts, targets):
@@ -60,12 +60,15 @@ class ImageClassificationPipeline(Pipeline):
 class ImageClassificationNanoPipeline(ImageClassificationPipeline):
     def get_dataset(self):
         ds_train = load_dataset(
-            "ylecun/mnist",
+            "uoft-cs/cifar10",
             split="train",
             streaming=True,
         )
         ds_test = load_dataset(
-            "ylecun/mnist",
+            "uoft-cs/cifar10",
             split="test[:10]",
         )
-        return ds_train, ds_test, ImageDataset
+        get_ds_func = lambda ds: ImageDataset(
+            ds, colname_image="img", colname_target="label"
+        )
+        return ds_train, ds_test, get_ds_func
