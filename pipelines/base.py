@@ -72,7 +72,8 @@ class Pipeline(ABC):
             dtype=torch.bfloat16,
         )
 
-        self.model = torch.compile(self.model)
+        if self.device.type == "cuda":
+            self.model = torch.compile(self.model)
 
         self.train_loader, self.test_loader = self._get_dataloader()
         self.log_interval = config_train.log_interval
@@ -251,6 +252,7 @@ class Pipeline(ABC):
                     self.scheduler.step()
 
                 if is_logging_step:
+                    self.logging({ "loss": loss.item() }, prefix="train/")
                     self.logging(self.metrics.compute(), prefix="train/")
 
                 if is_evaluating_step:
