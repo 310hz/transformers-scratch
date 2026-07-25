@@ -145,7 +145,7 @@ class CausalLanguageModelingNanoPipeline(CausalLanguageModelingPipeline):
         )
         ds_test = load_dataset(
             "globis-university/aozorabunko-clean",
-            split="train[:1%]",
+            split="train[:10]",
         )
         get_ds_func = lambda ds: TextDataset(ds, tokenizer, max_len)
         return ds_train, ds_test, get_ds_func
