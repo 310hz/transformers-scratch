@@ -126,12 +126,11 @@ class Pipeline(ABC):
         self.dpath_ckpt = dpath_ckpt
 
     @staticmethod
-    def _is_dist():
-        world_size = os.environ.get("WORLD_SIZE", 0)
+    def _is_dist() -> bool:
         return (
             dist.is_available()
             and torch.cuda.is_available()
-            and int(world_size) >= 2
+            and int(os.environ.get("WORLD_SIZE", "1")) > 1
         )
 
     def _setup_device(self):
@@ -161,7 +160,7 @@ class Pipeline(ABC):
             else:
                 params_adam.append(parameter)
 
-        if self._is_dist():
+        if self._is_dist(): # MuonWithAuxAdam only supports distributed training
             optimizer = MuonWithAuxAdam([
                 dict(params=params_muon, use_muon=True, **self.config.train.muon),
                 dict(params=params_adam, use_muon=False, **self.config.train.adam),
@@ -271,13 +270,6 @@ class Pipeline(ABC):
         if self.is_master:
             print("Training finished.", flush=True)
             self.wandb_run.finish()
-
-    def _reduce(self, tensor, avg=True):
-        if self.is_dist:
-            dist.reduce(tensor, dst=0)
-            if avg:
-                tensor = tensor / self.world_size
-        return tensor
 
     def _save_checkpoint(self, snapshot=False):
         model_state_dict = self.model.state_dict()
