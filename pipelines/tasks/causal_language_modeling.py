@@ -28,10 +28,9 @@ class TextDataset(IterableDataset):
             seq_id += 1
 
             while len(buf_token_ids) >= self.max_length:
-                yield (
-                    torch.tensor(buf_token_ids[:self.max_length]),
-                    torch.tensor(buf_seq_ids[:self.max_length]),
-                )
+                token_ids = torch.tensor(buf_token_ids[:self.max_length])
+                seq_ids = torch.tensor(buf_seq_ids[:self.max_length])
+                yield token_ids, seq_ids,
                 buf_token_ids = buf_token_ids[self.max_length:]
                 buf_seq_ids = buf_seq_ids[self.max_length:]
 
