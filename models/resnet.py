@@ -2,23 +2,30 @@ import torch.nn as nn
 
 
 def conv1x1(c_in, c_out, stride):
-    return nn.Conv2d(
-        c_in,
-        c_out,
-        kernel_size=1,
-        padding=0,
-        stride=stride,
-        bias=False,
+    return nn.Sequential(
+        nn.Conv2d(
+            c_in,
+            c_out,
+            kernel_size=1,
+            padding=0,
+            stride=stride,
+            bias=False,
+        ),
+        nn.BatchNorm2d(c_out),
     )
 
+
 def conv3x3(c_in, c_out, stride):
-    return nn.Conv2d(
-        c_in,
-        c_out,
-        kernel_size=3,
-        padding=1,
-        stride=stride,
-        bias=False,
+    return nn.Sequential(
+        nn.Conv2d(
+            c_in,
+            c_out,
+            kernel_size=3,
+            padding=1,
+            stride=stride,
+            bias=False,
+        ),
+        nn.BatchNorm2d(c_out),
     )
 
 
@@ -28,16 +35,11 @@ class BasicBlock(nn.Module):
         stride = 2 if downsample else 1
         self.conv = nn.Sequential(
             conv3x3(c_in, c_out, stride),
-            nn.BatchNorm2d(c_out),
             nn.ReLU(),
             conv3x3(c_out, c_out, stride=1),
-            nn.BatchNorm2d(c_out),
         )
         if c_in != c_out or downsample:
-            self.skip = nn.Sequential(
-                conv1x1(c_in, c_out, stride),
-                nn.BatchNorm2d(c_out),
-            )
+            self.skip = conv1x1(c_in, c_out, stride)
         else:
             self.skip = nn.Identity()
         self.relu = nn.ReLU()
@@ -52,19 +54,13 @@ class BottleneckBlock(nn.Module):
         stride = 2 if downsample else 1
         self.conv = nn.Sequential(
             conv1x1(c_in, c_mid, stride),
-            nn.BatchNorm2d(c_mid),
             nn.ReLU(),
             conv3x3(c_mid, c_mid, stride=1),
-            nn.BatchNorm2d(c_mid),
             nn.ReLU(),
             conv1x1(c_mid, c_out, stride=1),
-            nn.BatchNorm2d(c_out),
         )
         if c_in != c_out or downsample:
-            self.skip = nn.Sequential(
-                conv1x1(c_in, c_out, stride),
-                nn.BatchNorm2d(c_out),
-            )
+            self.skip = conv1x1(c_in, c_out, stride)
         else:
             self.skip = nn.Identity()
         self.relu = nn.ReLU()
