@@ -102,6 +102,7 @@ class Pipeline(ABC):
 
             self.wandb_run = wandb.init(
                 project=env.str("WANDB_PROJECT_NAME"),
+                group=self.config.task.name,
                 name=name,
                 config=self.config,
             )
