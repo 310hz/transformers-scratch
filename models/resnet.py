@@ -8,7 +8,7 @@ def conv1x1(c_in, c_out, stride):
         kernel_size=1,
         padding=0,
         stride=stride,
-        bias=False
+        bias=False,
     )
 
 def conv3x3(c_in, c_out, stride):
@@ -18,7 +18,7 @@ def conv3x3(c_in, c_out, stride):
         kernel_size=3,
         padding=1,
         stride=stride,
-        bias=False
+        bias=False,
     )
 
 
