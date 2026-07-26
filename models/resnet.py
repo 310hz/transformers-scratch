@@ -76,10 +76,11 @@ class BottleneckBlock(nn.Module):
 class BasicBlocks(nn.Module):
     def __init__(self, n_layers, c_in, c_out, downsample=True):
         super().__init__()
-        self.net = nn.Sequential(
-            BasicBlock(c_in, c_out, downsample=downsample),
-            *[BasicBlock(c_out, c_out, downsample=False) for _ in range(n_layers - 1)],
-        )
+        blocks = []
+        blocks.append(BasicBlock(c_in, c_out, downsample=downsample))
+        for _ in range(1, n_layers):
+            blocks.append(BasicBlock(c_out, c_out, downsample=False))
+        self.net = nn.Sequential(*blocks)
 
     def forward(self, x):
         return self.net(x)
@@ -88,10 +89,11 @@ class BasicBlocks(nn.Module):
 class BottleneckBlocks(nn.Module):
     def __init__(self, n_layers, c_in, c_mid, c_out, downsample=True):
         super().__init__()
-        self.net = nn.Sequential(
-            BottleneckBlock(c_in, c_mid, c_out, downsample=downsample),
-            *[BottleneckBlock(c_out, c_mid, c_out, downsample=False) for _ in range(n_layers - 1)],
-        )
+        blocks = []
+        blocks.append(BottleneckBlock(c_in, c_mid, c_out, downsample=downsample))
+        for _ in range(1, n_layers):
+            blocks.append(BottleneckBlock(c_out, c_mid, c_out, downsample=False))
+        self.net = nn.Sequential(*blocks)
 
     def forward(self, x):
         return self.net(x)
