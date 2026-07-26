@@ -27,6 +27,8 @@ FNAME_STATE = "state.pth"
 FNAME_MODEL = "model.safetensors"
 CPU = torch.device("cpu")
 
+env.read_env()
+
 
 class Pipeline(ABC):
     def __init__(self, config, state_dict_model=None):
