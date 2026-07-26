@@ -60,7 +60,6 @@ class BaseMeanMetric(BaseMetric):
             device=s.device,
             dtype=torch.int64,
         )
-        reduce(s, n_total)
         result = s / n_total
         if reset:
             self.reset()
@@ -68,18 +67,23 @@ class BaseMeanMetric(BaseMetric):
 
 
 class Accuracy(BaseMeanMetric):
+    def __init__(self, k=1):
+        super().__init__()
+        self.k = k
+
     @torch.no_grad()
     def update(self, predicts, targets):
-        predicts = predicts.argmax(dim=-1)
-        self.sum += (predicts == targets).to(torch.float32).sum()
-        self.n_total += predicts.numel()
+        topk_indices = predicts.topk(self.k, dim=-1).indices
+        is_correct = topk_indices == targets.unsqueeze(-1)
+        self.sum += is_correct.float().sum()
+        self.n_total += targets.numel()
 
 
 class MeanSquareError(BaseMeanMetric):
     @torch.no_grad()
     def update(self, predicts, targets):
         self.sum += F.mse_loss(predicts, targets, reduction="sum")
-        self.n_total += predicts.numel()
+        self.n_total += targets.numel()
 
 
 class CrossEntropy(BaseMeanMetric):
