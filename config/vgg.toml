@@ -5,7 +5,7 @@ name = "ImageClassification"
 name = "VGG16"
 
 [model.arch]
-num_classes = 1000
+n_classes = 1000
 
 [train]
 total_steps = 6000
