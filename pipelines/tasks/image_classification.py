@@ -28,7 +28,7 @@ class ImageDataset(IterableDataset):
 
 
 class ImageClassificationPipeline(Pipeline):
-    def get_dataset(self, download=True):
+    def get_dataset(self, test_stream=False):
         ds_train = load_dataset(
             "ILSVRC/imagenet-1k",
             split="train",
@@ -38,7 +38,7 @@ class ImageClassificationPipeline(Pipeline):
         ds_test = load_dataset(
             "ILSVRC/imagenet-1k",
             split="validation",
-            streaming=not download,
+            streaming=test_stream,
             token=env.str("HF_TOKEN")
         )
         return ds_train, ds_test, ImageDataset

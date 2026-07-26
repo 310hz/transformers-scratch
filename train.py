@@ -20,18 +20,18 @@ def main(
         "-c", "--dpath-ckpt",
         help="Path to the directory where checkpoints will be saved.",
     ),
-    download: bool = typer.Option(
-        True,
-        "--download/--no-download",
+    test_stream: bool = typer.Option(
+        False,
+        "--test-stream",
         help=(
-            "Download test data instead of streaming it. Training data "
+            "Stream test data instead of downloading it. Training data "
             "is always streamed."
         ),
     ),
 ):
     """Train a model."""
     pipeline = get_pipeline(src)
-    pipeline.setup_train(dpath_ckpt, download=download)
+    pipeline.setup_train(dpath_ckpt, test_stream=test_stream)
     pipeline.train()
 
 

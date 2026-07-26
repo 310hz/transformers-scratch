@@ -46,7 +46,7 @@ class CausalLanguageModelingPipeline(Pipeline):
         })
         return tokenizer
 
-    def get_dataset(self, download=True):
+    def get_dataset(self, test_stream=False):
         tokenizer = self.get_tokenizer(self.config.additional["tokenizer"])
         max_len = self.config.model.arch["max_len"]
         ds_train = load_dataset(
@@ -59,7 +59,7 @@ class CausalLanguageModelingPipeline(Pipeline):
             "hotchpotch/fineweb-2-edu-japanese",
             "small_tokens_cleaned",
             split="test",
-            streaming=not download,
+            streaming=test_stream,
         )
         get_ds_func = lambda ds: TextDataset(ds, tokenizer, max_len)
         return ds_train, ds_test, get_ds_func
@@ -136,7 +136,7 @@ class CausalLanguageModelingPipeline(Pipeline):
 
 # For demonstration of a smaller dataset and faster training.
 class CausalLanguageModelingNanoPipeline(CausalLanguageModelingPipeline):
-    def get_dataset(self, download=True):
+    def get_dataset(self, test_stream=None):
         tokenizer = self.get_tokenizer(self.config.additional["tokenizer"])
         max_len = self.config.model.arch["max_len"]
         ds_train = load_dataset(
@@ -147,7 +147,6 @@ class CausalLanguageModelingNanoPipeline(CausalLanguageModelingPipeline):
         ds_test = load_dataset(
             "globis-university/aozorabunko-clean",
             split="train[:10]",
-            streaming=not download,
         )
         get_ds_func = lambda ds: TextDataset(ds, tokenizer, max_len)
         return ds_train, ds_test, get_ds_func
