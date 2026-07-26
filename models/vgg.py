@@ -2,7 +2,7 @@ import torch.nn as nn
 
 
 class VGG16(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, n_classes):
         super().__init__()
         self.net = nn.Sequential(
             # (b, 3, 224, 224)
@@ -55,7 +55,7 @@ class VGG16(nn.Module):
             nn.Linear(4096, 4096),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(4096, num_classes),
+            nn.Linear(4096, n_classes),
             nn.ReLU(),
         )
 

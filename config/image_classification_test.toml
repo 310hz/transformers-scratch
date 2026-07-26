@@ -5,7 +5,7 @@ name = "ImageClassificationNano"
 name = "ResNet34"
 
 [model.arch]
-num_classes = 10
+n_classes = 10
 
 [train]
 total_steps = 100
