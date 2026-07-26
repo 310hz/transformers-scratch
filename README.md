@@ -1,6 +1,6 @@
 # Implementing Deep Learning Models from Scratch
 
-Implement deep learning models from scratch to deepen your understanding.
+A collection of deep learning models implemented from scratch to deepen my understanding.
 
 ## Models
 
