@@ -64,9 +64,6 @@ class Pipeline(ABC):
         )
         self.scaler = torch.amp.GradScaler()
 
-        if self.device.type == "cuda":
-            self.model = torch.compile(self.model)
-
         self.now_steps = 0
         self._setup_checkpoint(dpath_ckpt)
         self.is_dist = self._is_dist()
@@ -76,6 +73,9 @@ class Pipeline(ABC):
             device_type=self.device.type,
             dtype=torch.bfloat16,
         )
+
+        if self.device.type == "cuda":
+            self.model = torch.compile(self.model)
 
         self.train_loader, self.test_loader = self._get_dataloader(test_stream)
         self.log_interval = config_train.log_interval
