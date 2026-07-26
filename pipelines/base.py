@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -102,6 +101,7 @@ class Pipeline(ABC):
                     f"{self.start_time.strftime('%Y-%m-%d %H:%M')}"
                 )
 
+            wandb.login(key=env.str("WANDB_API_KEY"))
             self.wandb_run = wandb.init(
                 project=env.str("WANDB_PROJECT_NAME"),
                 group=self.config.task.name,
@@ -135,13 +135,13 @@ class Pipeline(ABC):
         return (
             dist.is_available()
             and torch.cuda.is_available()
-            and int(os.environ.get("WORLD_SIZE", "1")) > 1
+            and env.int("WORLD_SIZE", 1) > 1
         )
 
     def _setup_device(self):
         if self.is_dist:
-            rank = int(os.environ["LOCAL_RANK"])
-            self.global_rank = int(os.environ["RANK"])
+            rank = env.int("LOCAL_RANK")
+            self.global_rank = env.int("RANK")
             torch.accelerator.set_device_index(rank)
             acc = torch.accelerator.current_accelerator()
             backend = torch.distributed.get_default_backend_for_device(acc)
