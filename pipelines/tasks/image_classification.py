@@ -12,6 +12,7 @@ class ImageDataset(IterableDataset):
     def __init__(self, ds, colname_image="image", colname_target="label"):
         self.ds = ds
         self.transform = transforms.Compose([
+            transforms.Lambda(lambda image: image.convert("RGB")),
             transforms.Resize(224),
             transforms.RandomCrop(224),
             transforms.ToTensor(),
@@ -63,7 +64,7 @@ class ImageClassificationPipeline(Pipeline):
 
 
 class ImageClassificationNanoPipeline(ImageClassificationPipeline):
-    def get_dataset(self, download=True):
+    def get_dataset(self, test_stream=None):
         ds_train = load_dataset(
             "uoft-cs/cifar10",
             split="train",
@@ -72,7 +73,6 @@ class ImageClassificationNanoPipeline(ImageClassificationPipeline):
         ds_test = load_dataset(
             "uoft-cs/cifar10",
             split="test[:1000]",
-            streaming=not download,
         )
         get_ds_func = lambda ds: ImageDataset(
             ds, colname_image="img", colname_target="label"
