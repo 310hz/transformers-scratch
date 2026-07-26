@@ -2,6 +2,7 @@ import torch.nn.functional as F
 from torch.utils.data import IterableDataset
 import torchvision.transforms as transforms
 from datasets import load_dataset
+from environs import env
 
 from ..base import Pipeline
 from ..metrics import NamedMetric, CrossEntropy, Accuracy
@@ -32,11 +33,13 @@ class ImageClassificationPipeline(Pipeline):
             "ILSVRC/imagenet-1k",
             split="train",
             streaming=True,
+            token=env.str("HF_TOKEN")
         )
         ds_test = load_dataset(
             "ILSVRC/imagenet-1k",
-            split="validation[:10000]",
+            split="validation",
             streaming=not download,
+            token=env.str("HF_TOKEN")
         )
         return ds_train, ds_test, ImageDataset
 
