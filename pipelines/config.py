@@ -30,7 +30,6 @@ class TrainConfig:
     adam: dict
     muon: dict | None = None
     save_interval: int | None = None
-    wandb_project: str = "deep-learning-scratch"
     wandb_run: str | None = None
 
 @dataclass(frozen=True)
