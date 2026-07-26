@@ -219,7 +219,7 @@ class Pipeline(ABC):
             for batch in self.train_loader:
                 pbar.update()
                 self.now_steps += 1
-                now = self.check_now()
+                now = self._check_now()
 
                 if (not now.is_updating_step) and self.is_dist:
                     context_nosync = self.model.no_sync()
