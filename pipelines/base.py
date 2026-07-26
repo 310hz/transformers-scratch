@@ -165,7 +165,7 @@ class Pipeline(ABC):
             else:
                 params_adam.append(parameter)
 
-        if self._is_dist(): # MuonWithAuxAdam only supports distributed training
+        if params_muon and self._is_dist(): # MuonWithAuxAdam only supports distributed training
             optimizer = MuonWithAuxAdam([
                 dict(params=params_muon, use_muon=True, **self.config.train.muon),
                 dict(params=params_adam, use_muon=False, **self.config.train.adam),
