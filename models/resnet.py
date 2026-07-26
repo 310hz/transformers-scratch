@@ -1,19 +1,43 @@
 import torch.nn as nn
 
 
+def conv1x1(c_in, c_out, stride):
+    return nn.Conv2d(
+        c_in,
+        c_out,
+        kernel_size=1,
+        padding=0,
+        stride=stride,
+        bias=False
+    )
+
+def conv3x3(c_in, c_out, stride):
+    return nn.Conv2d(
+        c_in,
+        c_out,
+        kernel_size=3,
+        padding=1,
+        stride=stride,
+        bias=False
+    )
+
+
 class BasicBlock(nn.Module):
     def __init__(self, c_in, c_out, downsample=True):
         super().__init__()
         stride = 2 if downsample else 1
         self.conv = nn.Sequential(
-            nn.Conv2d(c_in, c_out, kernel_size=3, padding=1, stride=stride),
+            conv3x3(c_in, c_out, stride),
             nn.BatchNorm2d(c_out),
             nn.ReLU(),
-            nn.Conv2d(c_out, c_out, kernel_size=3, padding=1),
+            conv3x3(c_out, c_out, stride=1),
             nn.BatchNorm2d(c_out),
         )
         if c_in != c_out or downsample:
-            self.skip = nn.Conv2d(c_in, c_out, kernel_size=1, stride=stride)
+            self.skip = nn.Sequential(
+                conv1x1(c_in, c_out, stride),
+                nn.BatchNorm2d(c_out)
+            )
         else:
             self.skip = nn.Identity()
         self.relu = nn.ReLU()
@@ -31,7 +55,6 @@ class BasicBlocks(nn.Module):
         )
 
     def forward(self, x):
-        print(f"Input shape: {x.shape}")
         return self.net(x)
 
 
@@ -40,17 +63,20 @@ class BottleneckBlock(nn.Module):
         super().__init__()
         stride = 2 if downsample else 1
         self.conv = nn.Sequential(
-            nn.Conv2d(c_in, c_mid, kernel_size=1, stride=stride),
+            conv1x1(c_in, c_mid, stride),
             nn.BatchNorm2d(c_mid),
             nn.ReLU(),
-            nn.Conv2d(c_mid, c_mid, kernel_size=3, padding=1),
+            conv3x3(c_mid, c_mid, stride=1),
             nn.BatchNorm2d(c_mid),
             nn.ReLU(),
-            nn.Conv2d(c_mid, c_out, kernel_size=1),
+            conv1x1(c_mid, c_out, stride=1),
             nn.BatchNorm2d(c_out),
         )
         if c_in != c_out or downsample:
-            self.skip = nn.Conv2d(c_in, c_out, kernel_size=1, stride=stride)
+            self.skip = nn.Sequential(
+                conv1x1(c_in, c_out, stride),
+                nn.BatchNorm2d(c_out)
+            )
         else:
             self.skip = nn.Identity()
         self.relu = nn.ReLU()
@@ -68,7 +94,6 @@ class BottleneckBlocks(nn.Module):
         )
 
     def forward(self, x):
-        print(f"Input shape: {x.shape}")
         return self.net(x)
 
 
@@ -76,7 +101,7 @@ class ResNet34(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
@@ -97,7 +122,7 @@ class ResNet50(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
