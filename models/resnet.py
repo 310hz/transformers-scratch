@@ -36,7 +36,7 @@ class BasicBlock(nn.Module):
         if c_in != c_out or downsample:
             self.skip = nn.Sequential(
                 conv1x1(c_in, c_out, stride),
-                nn.BatchNorm2d(c_out)
+                nn.BatchNorm2d(c_out),
             )
         else:
             self.skip = nn.Identity()
@@ -63,7 +63,7 @@ class BottleneckBlock(nn.Module):
         if c_in != c_out or downsample:
             self.skip = nn.Sequential(
                 conv1x1(c_in, c_out, stride),
-                nn.BatchNorm2d(c_out)
+                nn.BatchNorm2d(c_out),
             )
         else:
             self.skip = nn.Identity()
