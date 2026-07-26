@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from importlib import import_module
 from collections import OrderedDict
 import contextlib
+from types import SimpleNamespace
 
 import torch
 import torch.distributed as dist
@@ -218,22 +219,9 @@ class Pipeline(ABC):
             for batch in self.train_loader:
                 pbar.update()
                 self.now_steps += 1
-                is_last = self.now_steps >= self.total_steps
-                if is_last:
-                    is_updating_step = True
-                    is_logging_step = True
-                    is_evaluating_step = True
-                    is_saving_step = self.save_interval is not None
-                else:
-                    is_updating_step = self.now_steps % self.grad_accum_steps == 0
-                    is_logging_step = self.now_steps % self.log_interval == 0
-                    is_evaluating_step = self.now_steps % self.eval_interval == 0
-                    is_saving_step = (
-                        self.save_interval
-                        and self.now_steps % self.save_interval == 0
-                    )
+                now = self.check_now()
 
-                if (not is_updating_step) and self.is_dist:
+                if (not now.is_updating_step) and self.is_dist:
                     context_nosync = self.model.no_sync()
                 else:
                     context_nosync = contextlib.nullcontext()
@@ -245,7 +233,7 @@ class Pipeline(ABC):
                 loss_scaled = self.scaler.scale(loss / self.grad_accum_steps)
                 loss_scaled.backward()
 
-                if is_updating_step:
+                if now.is_updating_step:
                     self.scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), self.max_grad_norm
@@ -255,26 +243,51 @@ class Pipeline(ABC):
                     self.optimizer.zero_grad()
                     self.scheduler.step()
 
-                if is_logging_step:
+                if now.is_logging_step:
                     self.logging({ "loss": loss.item() }, prefix="train/")
                     self.logging(self.metrics.compute(), prefix="train/")
 
-                if is_evaluating_step:
+                if now.is_evaluating_step:
                     self.model.eval()
                     self.logging(self.evaluate(), prefix="test/")
                     self.model.train()
 
-                if is_saving_step:
+                if now.is_saving_step:
                     if self.is_master:
                         self._save_checkpoint(snapshot=True)
 
-                if is_last:
+                if now.is_last:
                     is_running = False
                     break
 
         if self.is_master:
             print("Training finished.", flush=True)
             self.wandb_run.finish()
+
+    def _check_now(self):
+        is_last = self.now_steps >= self.total_steps
+        if is_last:
+            is_updating_step = True
+            is_logging_step = True
+            is_evaluating_step = True
+            is_saving_step = self.save_interval is not None
+        else:
+            is_updating_step = self.now_steps % self.grad_accum_steps == 0
+            is_logging_step = self.now_steps % self.log_interval == 0
+            is_evaluating_step = self.now_steps % self.eval_interval == 0
+            is_saving_step = (
+                self.save_interval
+                and self.now_steps % self.save_interval == 0
+            )
+        now = SimpleNamespace(
+            is_last=is_last,
+            is_updating_step=is_updating_step,
+            is_logging_step=is_logging_step,
+            is_evaluating_step=is_evaluating_step,
+            is_saving_step=is_saving_step,
+        )
+        return now
+
 
     def _save_checkpoint(self, snapshot=False):
         model_state_dict = self.model.state_dict()
