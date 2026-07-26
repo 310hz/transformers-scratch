@@ -42,7 +42,8 @@ class ImageClassificationPipeline(Pipeline):
     def get_metrics(self):
         return NamedMetric({
             "cross_entropy": CrossEntropy(),
-            "accuracy": Accuracy(),
+            "accuracy@1": Accuracy(k=1),
+            "accuracy@5": Accuracy(k=5),
         })
 
     def forward(self, batch):
