@@ -1,6 +1,6 @@
 from pathlib import Path
 import tomllib
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field, asdict
 
 from dacite import from_dict
 
@@ -27,8 +27,8 @@ class TrainConfig:
     warmup_ratio: float
     log_interval: int
     eval_interval: int
-    adam: dict
-    muon: dict | None = None
+    adam: dict = field(default_factory=dict)
+    muon: dict = field(default_factory=dict)
     save_interval: int | None = None
     wandb_run: str | None = None
 
