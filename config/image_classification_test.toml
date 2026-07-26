@@ -2,7 +2,7 @@
 name = "ImageClassificationNano"
 
 [model]
-name = "VGG16"
+name = "ResNet34"
 
 [model.arch]
 num_classes = 10
