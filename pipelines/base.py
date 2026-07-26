@@ -47,7 +47,7 @@ class Pipeline(ABC):
         model = cls(**arch)
         return model
 
-    def setup_train(self, dpath_ckpt=None):
+    def setup_train(self, dpath_ckpt=None, download=True):
         self.start_time = datetime.now(tz=ZoneInfo("Asia/Tokyo"))
         config_train = self.config.train # alias
 
@@ -78,7 +78,7 @@ class Pipeline(ABC):
         if self.device.type == "cuda":
             self.model = torch.compile(self.model)
 
-        self.train_loader, self.test_loader = self._get_dataloader()
+        self.train_loader, self.test_loader = self._get_dataloader(download)
         self.log_interval = config_train.log_interval
         self.eval_interval = config_train.eval_interval
         self.save_interval = config_train.save_interval
@@ -178,8 +178,8 @@ class Pipeline(ABC):
 
         return optimizer
 
-    def _get_dataloader(self):
-        ds_train, ds_test, get_ds_func = self.get_dataset()
+    def _get_dataloader(self, download):
+        ds_train, ds_test, get_ds_func = self.get_dataset(download)
         ds_train = ds_train.shuffle(buffer_size=10000)
 
         if (self.world_size >= 2) and (self.global_rank is not None):
@@ -321,7 +321,7 @@ class Pipeline(ABC):
         return result
 
     @abstractmethod
-    def get_dataset(self):
+    def get_dataset(self, download=True):
         pass
 
     @abstractmethod

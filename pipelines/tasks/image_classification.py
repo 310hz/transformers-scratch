@@ -27,7 +27,7 @@ class ImageDataset(IterableDataset):
 
 
 class ImageClassificationPipeline(Pipeline):
-    def get_dataset(self):
+    def get_dataset(self, download=True):
         ds_train = load_dataset(
             "ILSVRC/imagenet-1k",
             split="train",
@@ -36,6 +36,7 @@ class ImageClassificationPipeline(Pipeline):
         ds_test = load_dataset(
             "ILSVRC/imagenet-1k",
             split="validation[:10000]",
+            streaming=not download,
         )
         return ds_train, ds_test, ImageDataset
 
@@ -59,7 +60,7 @@ class ImageClassificationPipeline(Pipeline):
 
 
 class ImageClassificationNanoPipeline(ImageClassificationPipeline):
-    def get_dataset(self):
+    def get_dataset(self, download=True):
         ds_train = load_dataset(
             "uoft-cs/cifar10",
             split="train",
@@ -68,6 +69,7 @@ class ImageClassificationNanoPipeline(ImageClassificationPipeline):
         ds_test = load_dataset(
             "uoft-cs/cifar10",
             split="test[:1000]",
+            streaming=not download,
         )
         get_ds_func = lambda ds: ImageDataset(
             ds, colname_image="img", colname_target="label"
