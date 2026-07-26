@@ -66,7 +66,7 @@ class ImageClassificationNanoPipeline(ImageClassificationPipeline):
         )
         ds_test = load_dataset(
             "uoft-cs/cifar10",
-            split="test[:10]",
+            split="test[:1000]",
         )
         get_ds_func = lambda ds: ImageDataset(
             ds, colname_image="img", colname_target="label"
