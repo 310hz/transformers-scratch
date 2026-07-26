@@ -21,7 +21,6 @@ max_grad_norm = 1.0
 log_interval = 4
 eval_interval = 10
 warmup_ratio = 0.03
-wandb_project = "deep-learning-scratch"
 
 [train.muon]
 lr = 2e-2

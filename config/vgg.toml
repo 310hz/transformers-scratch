@@ -15,7 +15,6 @@ max_grad_norm = 1.0
 log_interval = 32
 eval_interval = 256
 warmup_ratio = 0.03
-wandb_project = "deep-learning-scratch"
 
 [train.adam]
 lr = 3e-4

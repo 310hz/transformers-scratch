@@ -16,6 +16,7 @@ from transformers import get_cosine_schedule_with_warmup
 from muon import MuonWithAuxAdam
 from safetensors.torch import save_file
 import wandb
+from environs import env
 from tqdm import tqdm
 
 
@@ -100,7 +101,7 @@ class Pipeline(ABC):
                 )
 
             self.wandb_run = wandb.init(
-                project=config_train.wandb_project,
+                project=env.str("WANDB_PROJECT_NAME"),
                 name=name,
                 config=self.config,
             )
