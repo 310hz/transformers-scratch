@@ -48,7 +48,7 @@ class Pipeline(ABC):
         if self.is_master:
             print("Training started.", flush=True)
 
-        self.setup_train(dpath_ckpt, test_stream)
+        self._setup_train(dpath_ckpt, test_stream)
         self.model.train()
 
         is_running = True
@@ -85,12 +85,12 @@ class Pipeline(ABC):
                     self.scheduler.step()
 
                 if now.is_logging_step:
-                    self.logging({ "loss": loss.item() }, prefix="train/")
-                    self.logging(self.metrics.compute(), prefix="train/")
+                    self._logging({ "loss": loss.item() }, prefix="train/")
+                    self._logging(self.metrics.compute(), prefix="train/")
 
                 if now.is_evaluating_step:
                     self.model.eval()
-                    self.logging(self.evaluate(), prefix="test/")
+                    self._logging(self._evaluate(), prefix="test/")
                     self.model.train()
 
                 if now.is_saving_step:
@@ -123,20 +123,20 @@ class Pipeline(ABC):
         pass
 
 
-    def get_model(self):
+    def _get_model(self):
         cls = getattr(import_module(f"{MODULE_MODELS}"), self.config.model.name)
         arch = self.config.model.arch or {}
         model = cls(**arch)
         return model
 
-    def setup_train(self, dpath_ckpt=None, test_stream=False):
+    def _setup_train(self, dpath_ckpt=None, test_stream=False):
         config_train = self.config.train # alias
         self.total_steps = config_train.total_steps
         self.grad_accum_steps = config_train.grad_accum_steps
         scheduler_steps = config_train.total_steps // config_train.grad_accum_steps
         self.max_grad_norm = config_train.max_grad_norm
 
-        self.model = self.get_model()
+        self.model = self._get_model()
         self.optimizer = self._get_optimizer()
         self.scheduler = get_cosine_schedule_with_warmup(
             self.optimizer,
@@ -338,14 +338,14 @@ class Pipeline(ABC):
             fpath_snapshot = self.dpath_ckpt / fname_snapshot
             torch.save(state_dict, fpath_snapshot)
 
-    def logging(self, data: dict, prefix: str = ""):
+    def _logging(self, data: dict, prefix: str = ""):
         data = {f"{prefix}{k}": v for k, v in data.items()}
         if self.is_master:
             self.wandb_run.log(data, step=self.now_steps)
             self._save_checkpoint()
 
     @torch.no_grad()
-    def evaluate(self):
+    def _evaluate(self):
         metrics = self.get_metrics()
         for batch in self.test_loader:
             predicts, targets = self.forward(batch)
