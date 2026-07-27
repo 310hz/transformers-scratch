@@ -110,7 +110,7 @@ class Pipeline(ABC):
         pass
 
     @abstractmethod
-    def get_metrics(self):
+    def get_metrics(self, prefix=""):
         pass
 
     @abstractmethod
@@ -215,7 +215,7 @@ class Pipeline(ABC):
         return (
             dist.is_available()
             and torch.cuda.is_available()
-            and int(os.getenv("WORLD_SIZE", "1")) > 1
+            and env.int("WORLD_SIZE") > 1
         )
 
     def _setup_device(self):
