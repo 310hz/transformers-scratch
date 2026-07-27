@@ -32,15 +32,9 @@ load_dotenv()
 
 
 class Pipeline(ABC):
-    def __init__(self, config, state_dict_model=None):
+    def __init__(self, config):
         self.config = config
-        self.device = current_accelerator(check_available=True) or CPU
-        self.model = self.get_model()
         self.n_params = sum(p.numel() for p in self.model.parameters())
-        if state_dict_model is not None:
-            self.model.load_state_dict(state_dict_model)
-        if not self._is_dist(): # Prevent the same model from being placed on multiple devices
-            self.model.to(self.device)
 
     def train(
         self,
@@ -50,10 +44,11 @@ class Pipeline(ABC):
         devices="auto",
         strategy="auto",
     ):
-        self.setup_train(dpath_ckpt, test_stream)
-
+        self.start_time = datetime.now(tz=ZoneInfo("Asia/Tokyo"))
         if self.is_master:
             print("Training started.", flush=True)
+
+        self.setup_train(dpath_ckpt, test_stream)
         self.model.train()
 
         is_running = True
@@ -135,19 +130,17 @@ class Pipeline(ABC):
         return model
 
     def setup_train(self, dpath_ckpt=None, test_stream=False):
-        self.start_time = datetime.now(tz=ZoneInfo("Asia/Tokyo"))
         config_train = self.config.train # alias
-
         self.total_steps = config_train.total_steps
         self.grad_accum_steps = config_train.grad_accum_steps
         scheduler_steps = config_train.total_steps // config_train.grad_accum_steps
-        warmup_steps = int(config_train.warmup_ratio * scheduler_steps)
         self.max_grad_norm = config_train.max_grad_norm
 
+        self.model = self.get_model()
         self.optimizer = self._get_optimizer()
         self.scheduler = get_cosine_schedule_with_warmup(
             self.optimizer,
-            num_warmup_steps=warmup_steps,
+            num_warmup_steps=int(config_train.warmup_ratio * scheduler_steps),
             num_training_steps=scheduler_steps,
         )
         self.scaler = torch.amp.GradScaler()
@@ -189,9 +182,8 @@ class Pipeline(ABC):
                     f"{self.start_time.strftime('%Y-%m-%d %H:%M')}"
                 )
 
-            wandb.login(key=env.str("WANDB_API_KEY"))
             self.wandb_run = wandb.init(
-                project=env.str("WANDB_PROJECT_NAME"),
+                project=os.getenv("WANDB_PROJECT_NAME"),
                 group=self.config.task.name,
                 name=name,
                 config=self.config,
@@ -223,13 +215,13 @@ class Pipeline(ABC):
         return (
             dist.is_available()
             and torch.cuda.is_available()
-            and env.int("WORLD_SIZE", 1) > 1
+            and int(os.getenv("WORLD_SIZE", "1")) > 1
         )
 
     def _setup_device(self):
         if self.is_dist:
-            rank = env.int("LOCAL_RANK")
-            self.global_rank = env.int("RANK")
+            rank = int(os.getenv("LOCAL_RANK"))
+            self.global_rank = int(os.getenv("RANK"))
             torch.accelerator.set_device_index(rank)
             acc = torch.accelerator.current_accelerator()
             backend = torch.distributed.get_default_backend_for_device(acc)
@@ -241,6 +233,7 @@ class Pipeline(ABC):
         else:
             self.world_size = 1
             self.global_rank = 0
+            self.device = current_accelerator(check_available=True) or CPU
             self.model = self.model.to(self.device)
 
     def _get_optimizer(self):
