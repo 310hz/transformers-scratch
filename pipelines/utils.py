@@ -27,5 +27,5 @@ def get_pipeline(src: str | Path) -> Pipeline:
 
     task = config.task.name
     cls = getattr(import_module(f"{MODULE_PIPELINES}"), f"{task}Pipeline")
-    pipeline = cls(config, state_dict_model=params)
+    pipeline = cls(config)
     return pipeline
