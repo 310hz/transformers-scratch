@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -16,7 +17,7 @@ from transformers import get_cosine_schedule_with_warmup
 from muon import MuonWithAuxAdam
 from safetensors.torch import save_file
 import wandb
-from environs import env
+from dotenv import load_dotenv
 from tqdm import tqdm
 
 
@@ -27,7 +28,7 @@ FNAME_STATE = "state.pth"
 FNAME_MODEL = "model.safetensors"
 CPU = torch.device("cpu")
 
-env.read_env()
+load_dotenv()
 
 
 class Pipeline(ABC):
