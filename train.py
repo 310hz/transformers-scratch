@@ -52,9 +52,17 @@ def main(
             "passed to Lightning Fabric."
         ),
     ),
+    use_scratch: bool = typer.Option(
+        False,
+        "--use-scratch",
+        help=(
+            "Use the scratch implementation of the pipeline instead of "
+            "the Lightning Fabric implementation."
+        ),
+    ),
 ):
     """Train a model."""
-    pipeline = get_pipeline(src)
+    pipeline = get_pipeline(src, use_scratch=use_scratch)
     pipeline.train(
         dpath_ckpt=dpath_ckpt,
         test_stream=test_stream,

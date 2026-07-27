@@ -1,16 +1,16 @@
+import os
 from importlib import import_module
 from pathlib import Path
 
 import torch
 
 from .config import get_config
-from .base import Pipeline
 
 
 MODULE_PIPELINES = "pipelines"
 
 
-def get_pipeline(src: str | Path) -> Pipeline:
+def get_pipeline(src: str | Path, use_scratch: bool = False):
     src = Path(src)
     assert src.exists(), f"Source '{src}' does not exist."
 
@@ -24,6 +24,11 @@ def get_pipeline(src: str | Path) -> Pipeline:
             params = state_dict["model"]
         case _:
             raise ValueError(f"Supported source types are .toml, .pth(pt).")
+
+    if use_scratch:
+        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "scratch"
+    else:
+        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "fabric"
 
     task = config.task.name
     cls = getattr(import_module(f"{MODULE_PIPELINES}"), f"{task}Pipeline")
