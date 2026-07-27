@@ -64,10 +64,10 @@ class CausalLanguageModelingPipeline(Pipeline):
         get_ds_func = lambda ds: TextDataset(ds, tokenizer, max_len)
         return ds_train, ds_test, get_ds_func
 
-    def get_metrics(self):
+    def get_metrics(self, prefix=""):
         return NamedMetric({
-            "cross_entropy": CrossEntropy(),
-            "perplexity": Perplexity(),
+            f"{prefix}cross_entropy": CrossEntropy(),
+            f"{prefix}perplexity": Perplexity(),
         })
 
     def _unpack_batch(self, batch):

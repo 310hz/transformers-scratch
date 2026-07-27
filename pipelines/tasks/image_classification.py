@@ -44,11 +44,11 @@ class ImageClassificationPipeline(Pipeline):
         )
         return ds_train, ds_test, ImageDataset
 
-    def get_metrics(self):
+    def get_metrics(self, prefix=""):
         return NamedMetric({
-            "cross_entropy": CrossEntropy(),
-            "accuracy@1": Accuracy(k=1),
-            "accuracy@5": Accuracy(k=5),
+            f"{prefix}cross_entropy": CrossEntropy(),
+            f"{prefix}accuracy@1": Accuracy(k=1),
+            f"{prefix}accuracy@5": Accuracy(k=5),
         })
 
     def forward(self, batch):
