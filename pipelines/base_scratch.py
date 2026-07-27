@@ -44,12 +44,30 @@ class Pipeline(ABC):
         strategy="auto",
     ):
         self.start_time = datetime.now(tz=ZoneInfo("Asia/Tokyo"))
+        self._setup_train(dpath_ckpt)
+
         if self.is_master:
             print("Training started.", flush=True)
 
-        self._setup_train(dpath_ckpt, test_stream)
-        self.model.train()
+        self.model = self._get_model()
+        if self.is_dist:
+            self.model = self.model.to(self.device)
+            self.model = DDP(self.model, device_ids=[self.local_rank])
+        if self.device.type == "cuda":
+            self.model = torch.compile(self.model)
+        self.optimizer = self._get_optimizer()
+        self.scheduler = get_cosine_schedule_with_warmup(
+            self.optimizer,
+            num_warmup_steps=self.warmup_steps,
+            num_training_steps=self.scheduler_steps,
+        )
+        self.scaler = torch.amp.GradScaler()
+        self.train_loader, self.test_loader = self._get_dataloader(test_stream)
+        self.metrics = self.get_metrics(prefix="train/")
 
+        self._show_train_info()
+
+        self.model.train()
         is_running = True
         pbar = tqdm(total=self.total_steps, disable=not self.is_master)
         pbar.n = self.now_steps
@@ -84,12 +102,12 @@ class Pipeline(ABC):
                     self.scheduler.step()
 
                 if now.is_logging_step:
-                    self._logging({ "loss": loss.item() }, prefix="train/")
-                    self._logging(self.metrics.compute(), prefix="train/")
+                    self._logging({ "loss": loss.item() })
+                    self._logging(self.metrics.compute())
 
                 if now.is_evaluating_step:
                     self.model.eval()
-                    self._logging(self._evaluate(), prefix="test/")
+                    self._logging(self._evaluate())
                     self.model.train()
 
                 if now.is_saving_step:
@@ -128,66 +146,65 @@ class Pipeline(ABC):
         model = cls(**arch)
         return model
 
-    def _setup_train(self, dpath_ckpt=None, test_stream=False):
+    def _setup_train(self, dpath_ckpt=None):
         config_train = self.config.train # alias
         self.total_steps = config_train.total_steps
         self.grad_accum_steps = config_train.grad_accum_steps
-        scheduler_steps = config_train.total_steps // config_train.grad_accum_steps
+        self.scheduler_steps = config_train.total_steps // config_train.grad_accum_steps
+        self.warmup_steps = int(config_train.warmup_ratio * self.scheduler_steps)
         self.max_grad_norm = config_train.max_grad_norm
-
-        self.model = self._get_model()
-        self.optimizer = self._get_optimizer()
-        self.scheduler = get_cosine_schedule_with_warmup(
-            self.optimizer,
-            num_warmup_steps=int(config_train.warmup_ratio * scheduler_steps),
-            num_training_steps=scheduler_steps,
-        )
-        self.scaler = torch.amp.GradScaler()
-
-        self.n_params = sum(p.numel() for p in self.model.parameters())
+        self.log_interval = config_train.log_interval
+        self.eval_interval = config_train.eval_interval
+        self.save_interval = config_train.save_interval
         self.now_steps = 0
-        self._setup_checkpoint(dpath_ckpt)
-        self.is_dist = self._is_dist()
-        self._setup_device()
-        self.is_master = self.global_rank == 0
         self.context_autocast = torch.autocast(
             device_type=self.device.type,
             dtype=torch.bfloat16,
         )
-
-        if self.device.type == "cuda":
-            self.model = torch.compile(self.model)
-
-        self.train_loader, self.test_loader = self._get_dataloader(test_stream)
-        self.log_interval = config_train.log_interval
-        self.eval_interval = config_train.eval_interval
-        self.save_interval = config_train.save_interval
-
-        self.metrics = self.get_metrics()
+        self.is_dist = (
+            dist.is_available()
+            and torch.cuda.is_available()
+            and env.int("WORLD_SIZE") > 1
+        )
+        if self.is_dist:
+            self.local_rank = env.int("LOCAL_RANK")
+            self.global_rank = env.int("RANK")
+            torch.accelerator.set_device_index(self.local_rank)
+            acc = torch.accelerator.current_accelerator()
+            backend = torch.distributed.get_default_backend_for_device(acc)
+            dist.init_process_group(backend)
+            self.world_size = dist.get_world_size()
+            self.device = torch.device(self.local_rank)
+        else:
+            self.world_size = 1
+            self.global_rank = 0
+            self.device = current_accelerator(check_available=True) or CPU
+            self.model = self.model.to(self.device)
+        self.is_master = self.global_rank == 0
+        self._setup_checkpoint(dpath_ckpt)
 
         if self.is_master:
+            name_default = (
+                f"[{self.config.model.name}] "
+                f"{self.start_time.strftime('%Y-%m-%d %H:%M')}"
+            )
+            self.wandb_run = wandb.init(
+                project=env("WANDB_PROJECT_NAME"),
+                group=self.config.task.name,
+                name=self.config.wandb_run or name_default,
+                config=self.config,
+            )
+
+    def _show_train_info(self):
+        if self.is_master:
+            n_params = sum(p.numel() for p in self.model.parameters())
             print(f"Model: {self.config.model.name}")
-            print(f"Number of parameters: {self.n_params:,}")
+            print(f"Number of parameters: {n_params:,}")
             print(f"Number of devices: {self.world_size}")
             if self.resume:
                 print(f"Resumed from checkpoint at {self.dpath_ckpt}")
             else:
                 print(f"Checkpoints will be saved to {self.dpath_ckpt}")
-
-            if config_train.wandb_run:
-                name = config_train.wandb_run
-            else:
-                name = (
-                    f"[{self.config.model.name} {self.n_params // 1_000_000}M] "
-                    f"{self.start_time.strftime('%Y-%m-%d %H:%M')}"
-                )
-
-            self.wandb_run = wandb.init(
-                project=env("WANDB_PROJECT_NAME"),
-                group=self.config.task.name,
-                name=name,
-                config=self.config,
-            )
 
     def _setup_checkpoint(self, dpath_ckpt):
         if dpath_ckpt is None:
@@ -210,31 +227,6 @@ class Pipeline(ABC):
             self.resume = True
         self.dpath_ckpt = dpath_ckpt
 
-    @staticmethod
-    def _is_dist() -> bool:
-        return (
-            dist.is_available()
-            and torch.cuda.is_available()
-            and env.int("WORLD_SIZE") > 1
-        )
-
-    def _setup_device(self):
-        if self.is_dist:
-            rank = env.int("LOCAL_RANK")
-            self.global_rank = env.int("RANK")
-            torch.accelerator.set_device_index(rank)
-            acc = torch.accelerator.current_accelerator()
-            backend = torch.distributed.get_default_backend_for_device(acc)
-            dist.init_process_group(backend)
-            self.world_size = dist.get_world_size()
-            self.device = torch.device(rank)
-            self.model = self.model.to(self.device)
-            self.model = DDP(self.model, device_ids=[rank])
-        else:
-            self.world_size = 1
-            self.global_rank = 0
-            self.device = current_accelerator(check_available=True) or CPU
-            self.model = self.model.to(self.device)
 
     def _get_optimizer(self):
         params_adam = []
@@ -246,7 +238,7 @@ class Pipeline(ABC):
             else:
                 params_adam.append(parameter)
 
-        if params_muon and self._is_dist(): # MuonWithAuxAdam only supports distributed training
+        if params_muon and self.is_dist: # MuonWithAuxAdam only supports distributed training
             optimizer = MuonWithAuxAdam([
                 dict(params=params_muon, use_muon=True, **self.config.train.muon),
                 dict(params=params_adam, use_muon=False, **self.config.train.adam),
@@ -338,15 +330,14 @@ class Pipeline(ABC):
             fpath_snapshot = self.dpath_ckpt / fname_snapshot
             torch.save(state_dict, fpath_snapshot)
 
-    def _logging(self, data: dict, prefix: str = ""):
-        data = {f"{prefix}{k}": v for k, v in data.items()}
+    def _logging(self, data: dict):
         if self.is_master:
             self.wandb_run.log(data, step=self.now_steps)
             self._save_checkpoint()
 
     @torch.no_grad()
     def _evaluate(self):
-        metrics = self.get_metrics()
+        metrics = self.get_metrics(prefix="test/")
         for batch in self.test_loader:
             predicts, targets = self.forward(batch)
             metrics.update(predicts, targets)
