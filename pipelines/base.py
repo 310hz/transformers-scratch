@@ -205,7 +205,16 @@ class Pipeline(ABC):
         )
         return train_loader, test_loader
 
-    def train(self):
+    def train(
+            self,
+            dpath_ckpt=None,
+            test_stream=False,
+            accelerator="auto",
+            devices="auto",
+            strategy="auto",
+        ):
+        self.setup_train(dpath_ckpt, test_stream)
+
         if self.is_master:
             print("Training started.", flush=True)
         self.model.train()
