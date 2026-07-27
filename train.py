@@ -36,7 +36,7 @@ def main(
             "Lightning Fabric."
         ),
     ),
-    devices: int | str = typer.Option(
+    devices: str = typer.Option(
         "auto",
         "-d", "--devices",
         help=(
