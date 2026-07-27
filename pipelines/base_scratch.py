@@ -50,8 +50,8 @@ class Pipeline(ABC):
             print("Training started.", flush=True)
 
         self.model = self._get_model()
+        self.model = self.model.to(self.device)
         if self.is_dist:
-            self.model = self.model.to(self.device)
             self.model = DDP(self.model, device_ids=[self.local_rank])
         if self.device.type == "cuda":
             self.model = torch.compile(self.model)
@@ -64,6 +64,10 @@ class Pipeline(ABC):
         self.scaler = torch.amp.GradScaler()
         self.train_loader, self.test_loader = self._get_dataloader(test_stream)
         self.metrics = self.get_metrics(prefix="train/")
+        self.context_autocast = torch.autocast(
+            device_type=self.device.type,
+            dtype=torch.bfloat16,
+        )
 
         self._show_train_info()
 
@@ -147,20 +151,17 @@ class Pipeline(ABC):
         return model
 
     def _setup_train(self, dpath_ckpt=None):
-        config_train = self.config.train # alias
-        self.total_steps = config_train.total_steps
-        self.grad_accum_steps = config_train.grad_accum_steps
-        self.scheduler_steps = config_train.total_steps // config_train.grad_accum_steps
-        self.warmup_steps = int(config_train.warmup_ratio * self.scheduler_steps)
-        self.max_grad_norm = config_train.max_grad_norm
-        self.log_interval = config_train.log_interval
-        self.eval_interval = config_train.eval_interval
-        self.save_interval = config_train.save_interval
+        ct = self.config.train # alias
+        self.total_steps = ct.total_steps
+        self.grad_accum_steps = ct.grad_accum_steps
+        self.scheduler_steps = ct.total_steps // ct.grad_accum_steps
+        self.warmup_steps = int(ct.warmup_ratio * self.scheduler_steps)
+        self.max_grad_norm = ct.max_grad_norm
+        self.log_interval = ct.log_interval
+        self.eval_interval = ct.eval_interval
+        self.save_interval = ct.save_interval
+
         self.now_steps = 0
-        self.context_autocast = torch.autocast(
-            device_type=self.device.type,
-            dtype=torch.bfloat16,
-        )
         self.is_dist = (
             dist.is_available()
             and torch.cuda.is_available()
@@ -179,7 +180,6 @@ class Pipeline(ABC):
             self.world_size = 1
             self.global_rank = 0
             self.device = current_accelerator(check_available=True) or CPU
-            self.model = self.model.to(self.device)
         self.is_master = self.global_rank == 0
         self._setup_checkpoint(dpath_ckpt)
 
@@ -191,7 +191,7 @@ class Pipeline(ABC):
             self.wandb_run = wandb.init(
                 project=env("WANDB_PROJECT_NAME"),
                 group=self.config.task.name,
-                name=self.config.wandb_run or name_default,
+                name=self.config.train.wandb_run or name_default,
                 config=self.config,
             )
 
