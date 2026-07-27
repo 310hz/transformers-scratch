@@ -1,6 +1,6 @@
-import typer
+import os
 
-from pipelines import get_pipeline
+import typer
 
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -62,7 +62,14 @@ def main(
     ),
 ):
     """Train a model."""
-    pipeline = get_pipeline(src, use_scratch=use_scratch)
+
+    if use_scratch:
+        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "scratch"
+    else:
+        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "fabric"
+
+    from pipelines import get_pipeline
+    pipeline = get_pipeline(src)
     pipeline.train(
         dpath_ckpt=dpath_ckpt,
         test_stream=test_stream,

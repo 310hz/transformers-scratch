@@ -25,11 +25,6 @@ def get_pipeline(src: str | Path, use_scratch: bool = False):
         case _:
             raise ValueError(f"Supported source types are .toml, .pth(pt).")
 
-    if use_scratch:
-        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "scratch"
-    else:
-        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "fabric"
-
     task = config.task.name
     cls = getattr(import_module(f"{MODULE_PIPELINES}"), f"{task}Pipeline")
     pipeline = cls(config)
