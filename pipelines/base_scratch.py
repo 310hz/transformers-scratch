@@ -13,7 +13,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.accelerator import current_accelerator
 from torch.utils.data import DataLoader
 from transformers import get_cosine_schedule_with_warmup
-from muon import MuonWithAuxAdam
+from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 from safetensors.torch import save_file
 import wandb
 from dotenv import load_dotenv
@@ -238,8 +238,13 @@ class Pipeline(ABC):
             else:
                 params_adam.append(parameter)
 
-        if params_muon and self.is_dist: # MuonWithAuxAdam only supports distributed training
-            optimizer = MuonWithAuxAdam([
+        if self.is_dist:
+            cls_optimizer = MuonWithAuxAdam
+        else:
+            cls_optimizer = SingleDeviceMuonWithAuxAdam
+
+        if params_muon:
+            optimizer = cls_optimizer([
                 dict(params=params_muon, use_muon=True, **self.config.train.muon),
                 dict(params=params_adam, use_muon=False, **self.config.train.adam),
             ])
