@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -18,6 +17,7 @@ from muon import MuonWithAuxAdam
 from safetensors.torch import save_file
 import wandb
 from dotenv import load_dotenv
+from environs import env
 from tqdm import tqdm
 
 
@@ -183,7 +183,7 @@ class Pipeline(ABC):
                 )
 
             self.wandb_run = wandb.init(
-                project=os.getenv("WANDB_PROJECT_NAME"),
+                project=env("WANDB_PROJECT_NAME"),
                 group=self.config.task.name,
                 name=name,
                 config=self.config,
@@ -220,8 +220,8 @@ class Pipeline(ABC):
 
     def _setup_device(self):
         if self.is_dist:
-            rank = int(os.getenv("LOCAL_RANK"))
-            self.global_rank = int(os.getenv("RANK"))
+            rank = env.int("LOCAL_RANK")
+            self.global_rank = env.int("RANK")
             torch.accelerator.set_device_index(rank)
             acc = torch.accelerator.current_accelerator()
             backend = torch.distributed.get_default_backend_for_device(acc)
