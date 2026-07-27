@@ -34,7 +34,6 @@ load_dotenv()
 class Pipeline(ABC):
     def __init__(self, config):
         self.config = config
-        self.n_params = sum(p.numel() for p in self.model.parameters())
 
     def train(
         self,
@@ -145,6 +144,7 @@ class Pipeline(ABC):
         )
         self.scaler = torch.amp.GradScaler()
 
+        self.n_params = sum(p.numel() for p in self.model.parameters())
         self.now_steps = 0
         self._setup_checkpoint(dpath_ckpt)
         self.is_dist = self._is_dist()
