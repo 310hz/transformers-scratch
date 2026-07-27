@@ -41,6 +41,91 @@ class Pipeline(ABC):
         if not self._is_dist(): # Prevent the same model from being placed on multiple devices
             self.model.to(self.device)
 
+    def train(
+            self,
+            dpath_ckpt=None,
+            test_stream=False,
+            accelerator="auto",
+            devices="auto",
+            strategy="auto",
+        ):
+        self.setup_train(dpath_ckpt, test_stream)
+
+        if self.is_master:
+            print("Training started.", flush=True)
+        self.model.train()
+
+        is_running = True
+        pbar = tqdm(total=self.total_steps, disable=not self.is_master)
+        pbar.n = self.now_steps
+        pbar.refresh()
+
+        while is_running:
+            for batch in self.train_loader:
+                pbar.update()
+                self.now_steps += 1
+                now = self._check_now()
+
+                if (not now.is_updating_step) and self.is_dist:
+                    context_nosync = self.model.no_sync()
+                else:
+                    context_nosync = contextlib.nullcontext()
+
+                with context_nosync, self.context_autocast:
+                    predicts, targets = self.forward(batch)
+                    self.metrics.update(predicts, targets)
+                    loss = self.loss_fn(predicts, targets)
+                loss_scaled = self.scaler.scale(loss / self.grad_accum_steps)
+                loss_scaled.backward()
+
+                if now.is_updating_step:
+                    self.scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(), self.max_grad_norm
+                    )
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                    self.optimizer.zero_grad()
+                    self.scheduler.step()
+
+                if now.is_logging_step:
+                    self.logging({ "loss": loss.item() }, prefix="train/")
+                    self.logging(self.metrics.compute(), prefix="train/")
+
+                if now.is_evaluating_step:
+                    self.model.eval()
+                    self.logging(self.evaluate(), prefix="test/")
+                    self.model.train()
+
+                if now.is_saving_step:
+                    if self.is_master:
+                        self._save_checkpoint(snapshot=True)
+
+                if now.is_last:
+                    is_running = False
+                    break
+
+        if self.is_master:
+            print("Training finished.", flush=True)
+            self.wandb_run.finish()
+
+    @abstractmethod
+    def get_dataset(self, test_stream=False):
+        pass
+
+    @abstractmethod
+    def get_metrics(self):
+        pass
+
+    @abstractmethod
+    def forward(self, batch):
+        pass
+
+    @abstractmethod
+    def loss_fn(self, predicts, targets):
+        pass
+
+
     def get_model(self):
         cls = getattr(import_module(f"{MODULE_MODELS}"), self.config.model.name)
         arch = self.config.model.arch or {}
@@ -205,74 +290,6 @@ class Pipeline(ABC):
         )
         return train_loader, test_loader
 
-    def train(
-            self,
-            dpath_ckpt=None,
-            test_stream=False,
-            accelerator="auto",
-            devices="auto",
-            strategy="auto",
-        ):
-        self.setup_train(dpath_ckpt, test_stream)
-
-        if self.is_master:
-            print("Training started.", flush=True)
-        self.model.train()
-
-        is_running = True
-        pbar = tqdm(total=self.total_steps, disable=not self.is_master)
-        pbar.n = self.now_steps
-        pbar.refresh()
-
-        while is_running:
-            for batch in self.train_loader:
-                pbar.update()
-                self.now_steps += 1
-                now = self._check_now()
-
-                if (not now.is_updating_step) and self.is_dist:
-                    context_nosync = self.model.no_sync()
-                else:
-                    context_nosync = contextlib.nullcontext()
-
-                with context_nosync, self.context_autocast:
-                    predicts, targets = self.forward(batch)
-                    self.metrics.update(predicts, targets)
-                    loss = self.loss_fn(predicts, targets)
-                loss_scaled = self.scaler.scale(loss / self.grad_accum_steps)
-                loss_scaled.backward()
-
-                if now.is_updating_step:
-                    self.scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(
-                        self.model.parameters(), self.max_grad_norm
-                    )
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    self.optimizer.zero_grad()
-                    self.scheduler.step()
-
-                if now.is_logging_step:
-                    self.logging({ "loss": loss.item() }, prefix="train/")
-                    self.logging(self.metrics.compute(), prefix="train/")
-
-                if now.is_evaluating_step:
-                    self.model.eval()
-                    self.logging(self.evaluate(), prefix="test/")
-                    self.model.train()
-
-                if now.is_saving_step:
-                    if self.is_master:
-                        self._save_checkpoint(snapshot=True)
-
-                if now.is_last:
-                    is_running = False
-                    break
-
-        if self.is_master:
-            print("Training finished.", flush=True)
-            self.wandb_run.finish()
-
     def _check_now(self):
         is_last = self.now_steps >= self.total_steps
         if is_last:
@@ -341,19 +358,3 @@ class Pipeline(ABC):
             metrics.update(predicts, targets)
         result = metrics.compute()
         return result
-
-    @abstractmethod
-    def get_dataset(self, test_stream=False):
-        pass
-
-    @abstractmethod
-    def get_metrics(self):
-        pass
-
-    @abstractmethod
-    def forward(self, batch):
-        pass
-
-    @abstractmethod
-    def loss_fn(self, predicts, targets):
-        pass
