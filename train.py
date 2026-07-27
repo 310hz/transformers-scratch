@@ -28,11 +28,40 @@ def main(
             "is always streamed."
         ),
     ),
+    accelerator: str = typer.Option(
+        "auto",
+        "-a", "--accelerator",
+        help=(
+            "Accelerator to use for training. This will be passed to "
+            "Lightning Fabric."
+        ),
+    ),
+    devices: int | str = typer.Option(
+        "auto",
+        "-d", "--devices",
+        help=(
+            "Number of devices to use for training. This will be "
+            "passed to Lightning Fabric."
+        ),
+    ),
+    strategy: str = typer.Option(
+        "auto",
+        "-s", "--strategy",
+        help=(
+            "Strategy to use for distributed training. This will be "
+            "passed to Lightning Fabric."
+        ),
+    ),
 ):
     """Train a model."""
     pipeline = get_pipeline(src)
-    pipeline.setup_train(dpath_ckpt, test_stream=test_stream)
-    pipeline.train()
+    pipeline.train(
+        dpath_ckpt=dpath_ckpt,
+        test_stream=test_stream,
+        accelerator=accelerator,
+        devices=devices,
+        strategy=strategy
+    )
 
 
 if __name__ == "__main__":
