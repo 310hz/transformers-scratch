@@ -42,13 +42,13 @@ class Pipeline(ABC):
             self.model.to(self.device)
 
     def train(
-            self,
-            dpath_ckpt=None,
-            test_stream=False,
-            accelerator="auto",
-            devices="auto",
-            strategy="auto",
-        ):
+        self,
+        dpath_ckpt=None,
+        test_stream=False,
+        accelerator="auto",
+        devices="auto",
+        strategy="auto",
+    ):
         self.setup_train(dpath_ckpt, test_stream)
 
         if self.is_master:
@@ -108,6 +108,7 @@ class Pipeline(ABC):
         if self.is_master:
             print("Training finished.", flush=True)
             self.wandb_run.finish()
+
 
     @abstractmethod
     def get_dataset(self, test_stream=False):
@@ -313,7 +314,6 @@ class Pipeline(ABC):
             is_saving_step=is_saving_step,
         )
         return now
-
 
     def _save_checkpoint(self, snapshot=False):
         model_state_dict = self.model.state_dict()
