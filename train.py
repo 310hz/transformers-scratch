@@ -64,9 +64,7 @@ def main(
     """Train a model."""
 
     if use_scratch:
-        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "scratch"
-    else:
-        os.environ["DEEP_LEARNING_SCRATCH_BASE_TYPE"] = "fabric"
+        os.environ["DEEP_LEARNING_SCRATCH_USE_SCRATCH"] = "1"
 
     from pipelines import get_pipeline
     pipeline = get_pipeline(src)

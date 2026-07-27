@@ -1,4 +1,3 @@
-import os
 from importlib import import_module
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from .config import get_config
 MODULE_PIPELINES = "pipelines"
 
 
-def get_pipeline(src: str | Path, use_scratch: bool = False):
+def get_pipeline(src: str | Path):
     src = Path(src)
     assert src.exists(), f"Source '{src}' does not exist."
 
